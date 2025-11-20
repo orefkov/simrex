@@ -49,14 +49,11 @@ set_target_properties(
 function(add_simstr)
     set(SIMSTR_BUILD_TESTS OFF)
     set(SIMSTR_BENCHMARKS OFF)
-    if(SIMREX_IN_SHARED)
-        set(SIMSTR_IN_SHARED On)
-    endif()
     FetchContent_Declare(
         simstr
         GIT_REPOSITORY https://github.com/orefkov/simstr.git
         GIT_SHALLOW TRUE
-        GIT_TAG 4ddb1ae
+        GIT_TAG tags/rel1.2.5
         FIND_PACKAGE_ARGS NAMES simstr
     )
     FetchContent_MakeAvailable(simstr)
