@@ -115,7 +115,7 @@ std::vector<std::pair<int, typename OnigRegexp<K>::str_type>> OnigRegexp<K>::par
                 if (dollar == str::npos) {
                     fnd = endRepl;
                 } else {
-                    fnd = start + dollar;
+                    fnd = replText.str + dollar;
                 }
             }
         }
