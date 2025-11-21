@@ -6,6 +6,7 @@
 #include <simstr/sstring.h>
 #include <oniguruma.h>
 #include <list>
+#include <optional>
 
 #ifdef SIMREX_IN_SHARED
     #if defined(_MSC_VER) || (defined(__clang__) && __has_declspec_attribute(dllexport))
@@ -27,26 +28,14 @@ namespace simrex {
 using namespace simstr;
 using namespace simstr::literals;
 
-namespace utils {
-
-template<auto delete_>
-struct SimpleDeleter {
-    void operator()(auto ptr) const {
-        if (ptr) {
-            delete_(ptr);
-        }
-    }
-};
-
-} // namespace utils
-
 struct OnigRegionDeleter {
-    void operator()(OnigRegion* region) const {
-        onig_region_free(region, 1);
-    }
+    SIMREX_API void operator()(OnigRegion* region) const;
+};
+struct OnigRexDeleter {
+    SIMREX_API void operator()(OnigRegex rex) const;
 };
 
-using RegexPtr = std::unique_ptr<OnigRegexType, utils::SimpleDeleter<onig_free>>;
+using RegexPtr = std::unique_ptr<OnigRegexType, OnigRexDeleter>;
 using RegionPtr = std::unique_ptr<OnigRegion, OnigRegionDeleter>;
 
 class OnigRegExpBase {
@@ -66,34 +55,16 @@ protected:
     OnigRegExpBase() = default;
     OnigRegExpBase(const OnigUChar* pattern, size_t length, OnigEncoding enc) : regexp_{create_regex(pattern, length, enc)} {}
 
-    static OnigRegex create_regex(const OnigUChar* pattern, size_t length, OnigEncoding enc) {
-        const OnigUChar *end = pattern + length;
-        OnigRegex temp = nullptr;
-        return ONIG_NORMAL == onig_new(&temp, pattern, end, ONIG_OPTION_DEFAULT, enc, ONIG_SYNTAX_DEFAULT, nullptr) ? temp : nullptr;
-    }
+    SIMREX_API static OnigRegex create_regex(const OnigUChar* pattern, size_t length, OnigEncoding enc);
 
     OnigRegExpBase(OnigRegExpBase&& other) noexcept = default;
     ~OnigRegExpBase() = default;
     OnigRegExpBase& operator=(OnigRegExpBase&& other) noexcept = default;
 
-    int search(const OnigUChar* start, size_t length, size_t offset) const {
-        const OnigUChar* end = start + length;
-        return onig_search(*this, start, end, start + offset, end, nullptr, ONIG_OPTION_NONE);
-    }
+    SIMREX_API int search(const OnigUChar* start, size_t length, size_t offset) const;
 
     RegexPtr regexp_;
 };
-
-template<typename K>
-OnigEncoding rexEncoding() {
-    if constexpr (sizeof(K) == 2) {
-        return std::endian::native == std::endian::big ? ONIG_ENCODING_UTF16_BE : ONIG_ENCODING_UTF16_LE;
-    }
-    if constexpr (sizeof(K) == 4) {
-        return std::endian::native == std::endian::big ? ONIG_ENCODING_UTF32_BE : ONIG_ENCODING_UTF32_LE;
-    }
-    return ONIG_ENCODING_UTF8;
-}
 
 template<typename K>
 struct RexTraits {
@@ -133,7 +104,7 @@ public:
      * @brief Создает объект Onig Regexp.
      * @param pattern - регулярное выражение.
      */
-    OnigRegexp(str_type pattern) : OnigRegExpBase(rt::toChar(pattern.symbols()), rt::toLen(pattern.length()), rexEncoding<K>()) {}
+    OnigRegexp(str_type pattern) : OnigRegExpBase(rt::toChar(pattern.symbols()), rt::toLen(pattern.length()), rex_encoding()) {}
 
     OnigRegexp& operator=(OnigRegexp&& other) noexcept = default;
 
@@ -162,26 +133,42 @@ public:
      * @param offset -  начальная позиция поиска (по умолчанию 0).
      * @return T - текст найденного вхождения, или пустую строку, если не найдено.
      */
-    template<typename T = str_type>
+    template<StrType<K> T = str_type>
     T first_founded(str_type text, size_t offset = 0) const {
         return first_founded_str(text, offset);
     }
     /*!
      * @brief Получить тексты всех найденных вхождений, без разделения на подгруппы.
-     * @tparam T - тип текста в возвращаемом результате, по умолчанию simple_str<K>.
+     * @param text - текст, в котором ищем.
+     * @param offset -  начальная позиция поиска (по умолчанию 0).
+     * @param maxCount - максимальное количество для ограничения поиска.
+     * @return std::vector<simple_str<K>> - вектор с текстами всех найденных вхождений.
+     */
+    SIMREX_API std::vector<str_type> all_founded(str_type text, size_t offset = 0, size_t maxCount = -1) const;
+    /*!
+     * @brief Получить тексты всех найденных вхождений, без разделения на подгруппы, в заданном типе.
+     * @tparam T - тип текста в возвращаемом результате.
      * @param text - текст, в котором ищем.
      * @param offset -  начальная позиция поиска (по умолчанию 0).
      * @param maxCount - максимальное количество для ограничения поиска.
      * @return std::vector<T> - вектор с текстами всех найденных вхождений.
      */
-    template<typename T = str_type>
+    template<StrType<K> T>
     std::vector<T> all_founded(str_type text, size_t offset = 0, size_t maxCount = -1) const {
         std::vector<T> matches;
-        all_founded_str(text, offset, maxCount, [](str_type word, void* res) {
-            reinterpret_cast<std::vector<T>*>(res)->emplace_back(word);
-        }, &matches);
+        all_founded_str(text, offset, maxCount, &matches, [](str_type word, void* res) {
+            static_cast<std::vector<T>*>(res)->emplace_back(word);
+        });
         return matches;
     }
+    /*!
+     * @brief Получить текст первого найденного вхождения вместе с текстами подгрупп.
+     * @param text - текст, в котором ищем.
+     * @param offset -  начальная позиция поиска (по умолчанию 0).
+     * @return std::vector<simple_str<K>> - массив с текстами найденного вхождения - в первом элементе массива возвращает
+     *      текст всего найденного вхождения, а далее тексты подгрупп.
+     */
+    SIMREX_API std::vector<str_type> texts_in_first_match(str_type text, size_t offset = 0) const;
     /*!
      * @brief Получить текст первого найденного вхождения вместе с текстами подгрупп.
      * @tparam T - тип текста в возвращаемом результате, по умолчанию simple_str<K>.
@@ -190,21 +177,27 @@ public:
      * @return std::vector<T> - массив с текстами найденного вхождения - в первом элементе массива возвращает
      *      текст всего найденного вхождения, а далее тексты подгрупп.
      */
-    template<typename T = str_type>
-    std::vector<T> first_matched(str_type text, size_t offset = 0) const {
+    template<StrType<K> T>
+    std::vector<T> texts_in_first_match(str_type text, size_t offset = 0) const {
         std::vector<T> matches;
-        if (isValid()) {
-            const OnigUChar *start = rt::toChar(text.begin()), *end = rt::toChar(text.end());
-            RegionPtr region{onig_region_new()};
-            if (onig_search(*this, start, end, start + rt::toLen(offset), end, region.get(), ONIG_OPTION_NONE) >= 0) {
-                matches.reserve(region->num_regs);
-                for (int i = 0; i < region->num_regs; i++) {
-                    matches.emplace_back(str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
-                }
+        for_first_match(text, offset, &matches, [](OnigRegion* region, const OnigUChar *start, void* res) {
+            std::vector<T>& matches = *static_cast<std::vector<T>*>(res);
+            matches.reserve(region->num_regs);
+            for (int i = 0; i < region->num_regs; i++) {
+                matches.emplace_back(str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
             }
-        }
+        });
         return matches;
     }
+    /*!
+     * @brief Получить тексты всех найденных вхождений вместе с подгруппами.
+     * @param text - текст, в котором ищем.
+     * @param offset -  начальная позиция поиска (по умолчанию 0).
+     * @param maxCount - максимальное количество для ограничения поиска.
+     * @return std::vector<std::vector<simple_str<K>>> - массив с массивами, в которых в первом элементе находится
+     *      текст всего найденного вхождения, а далее тексты подгрупп.
+     */
+    SIMREX_API std::vector<std::vector<str_type>> texts_in_all_matches(str_type text, size_t offset = 0, size_t maxCount = -1) const;
     /*!
      * @brief Получить тексты всех найденных вхождений вместе с подгруппами.
      * @tparam T - тип текста в возвращаемом результате, по умолчанию simple_str<K>.
@@ -214,33 +207,28 @@ public:
      * @return std::vector<std::vector<T>> - массив с массивами, в которых в первом элементе находится
      *      текст всего найденного вхождения, а далее тексты подгрупп.
      */
-    template<typename T = str_type>
-    std::vector<std::vector<T>> all_matched(str_type text, size_t offset = 0, size_t maxCount = -1) const {
+    template<StrType<K> T>
+    std::vector<std::vector<T>> texts_in_all_matches(str_type text, size_t offset = 0, size_t maxCount = -1) const {
         std::vector<std::vector<T>> matches;
-        if (isValid()) {
-            const OnigUChar *start = rt::toChar(text.begin()), *end = rt::toChar(text.end()), *at = start + rt::toLen(offset);
-            RegionPtr region{onig_region_new()};
-            for (size_t count = 0; count < maxCount; count++) {
-                if (onig_search(*this, start, end, at, end, region.get(), ONIG_OPTION_NONE) >= 0) {
-                    auto& match = matches.emplace_back();
-                    match.reserve(region->num_regs);
-                    for (int i = 0; i < region->num_regs; i++) {
-                        match.emplace_back(str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
-                    }
-                    const OnigUChar* newAt = start + region->end[0];
-                    if (newAt <= at || newAt >= end) {
-                        break;
-                    }
-                    at = newAt;
-                } else {
-                    break;
-                }
+        for_all_match(text, offset, maxCount, &matches, [](OnigRegion* region, const OnigUChar* start, void* res) {
+            std::vector<std::vector<T>>& matches = *static_cast<std::vector<std::vector<T>>*>(res);
+            auto& match = matches.emplace_back();
+            match.reserve(region->num_regs);
+            for (int i = 0; i < region->num_regs; i++) {
+                match.emplace_back(str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
             }
-        }
+        });
         return matches;
     }
-    // Возвращает массив пар - индекс начала совпадения в строке и его текст + подгруппы
-
+    /*!
+     * @brief Получить всю информацию о первом найденном вхождении.
+     * @param text - текст, в котором ищем.
+     * @param offset -  начальная позиция поиска (по умолчанию 0).
+     * @return std::vector<std::pair<size_t, simple_str<K>>> - массив, в котором первый элемент описывает всё вхождение, а следующие -
+     *      подгруппы вхождения. Описание представляет собой пару, первый элемент которой - позиция начала вхождения,
+     *      второй - текст вхождения.
+     */
+    SIMREX_API std::vector<std::pair<size_t, str_type>> first_match(str_type text, size_t offset = 0) const;
     /*!
      * @brief Получить всю информацию о первом найденном вхождении.
      * @tparam T - тип текста в возвращаемом результате, по умолчанию simple_str<K>.
@@ -250,24 +238,31 @@ public:
      *      подгруппы вхождения. Описание представляет собой пару, первый элемент которой - позиция начала вхождения,
      *      второй - текст вхождения.
      */
-    template<typename T = str_type>
+    template<StrType<K> T>
     std::vector<std::pair<size_t, T>> first_match(str_type text, size_t offset = 0) const {
-        std::vector<std::pair<size_t, T>> matches;
-        if (isValid()) {
-            const OnigUChar *start = rt::toChar(text.begin()), *end = rt::toChar(text.end());
-            RegionPtr region{onig_region_new()};
-            int result = onig_search(*this, start, end, start + rt::toLen(offset), end, region.get(), ONIG_OPTION_NONE);
-            if (result >= 0) {
-                matches.reserve(region->num_regs);
-                for (int i = 0; i < region->num_regs; i++) {
-                    matches.emplace_back(
-                        rt::fromLen(region->beg[i]),
-                        str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
-                }
+        std::vector<std::pair<size_t, T>> match;
+        for_first_match(text, offset, &match, [](OnigRegion* region, const OnigUChar *start, void* res) {
+            std::vector<std::pair<size_t, T>>& match = *static_cast<std::vector<std::pair<size_t, T>>*>(res);
+            match.reserve(region->num_regs);
+            for (int i = 0; i < region->num_regs; i++) {
+                match.emplace_back(
+                    rt::fromLen(region->beg[i]),
+                    str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
             }
-        }
-        return matches;
+        });
+        return match;
     }
+    /*!
+     * @brief Получить всю информацию о всех найденных вхождениях.
+     * @param text - текст, в котором ищем.
+     * @param offset -  начальная позиция поиска (по умолчанию 0).
+     * @param maxCount - максимальное количество для ограничения поиска.
+     * @return std::vector<std::vector<std::pair<size_t, simple_str<K>>>> - массив со всеми вхождениями, в котором каждый элемент -
+     *      массив, описывающий вхождение, в котором первый элемент описывает всё вхождение, а следующие -
+     *      подгруппы вхождения. Описание представляет собой пару, первый элемент которой - позиция начала вхождения,
+     *      второй - текст вхождения.
+     */
+    SIMREX_API std::vector<std::vector<std::pair<size_t, str_type>>> all_matches(str_type text, size_t offset = 0, size_t maxCount = -1) const;
     /*!
      * @brief Получить всю информацию о всех найденных вхождениях.
      * @tparam T - тип текста в возвращаемом результате, по умолчанию simple_str<K>.
@@ -279,31 +274,19 @@ public:
      *      подгруппы вхождения. Описание представляет собой пару, первый элемент которой - позиция начала вхождения,
      *      второй - текст вхождения.
      */
-    template<typename T = str_type>
+    template<StrType<K> T>
     std::vector<std::vector<std::pair<size_t, T>>> all_matches(str_type text, size_t offset = 0, size_t maxCount = -1) const {
         std::vector<std::vector<std::pair<size_t, T>>> matches;
-        if (isValid()) {
-            const OnigUChar *start = rt::toChar(text.begin()), *end = rt::toChar(text.end()), *at = start + rt::toLen(offset);
-            RegionPtr region{onig_region_new()};
-            for (size_t count = 0; count < maxCount; count++) {
-                if (onig_search(*this, start, end, at, end, region.get(), ONIG_OPTION_NONE) >= 0) {
-                    auto& match = matches.emplace_back();
-                    match.reserve(region->num_regs);
-                    for (int i = 0; i < region->num_regs; i++) {
-                        match.emplace_back(
-                            rt::fromLen(region->beg[i]),
-                            str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
-                    }
-                    const OnigUChar* newAt = start + region->end[0];
-                    if (newAt <= at || newAt >= end) {
-                        break;
-                    }
-                    at = newAt;
-                } else {
-                    break;
-                }
+        for_all_match(text, offset, maxCount, &matches, [](OnigRegion* region, const OnigUChar* start, void* res){
+            std::vector<std::vector<std::pair<size_t, T>>>& matches = *static_cast<std::vector<std::vector<std::pair<size_t, T>>>*>(res);
+            auto& match = matches.emplace_back();
+            match.reserve(region->num_regs);
+            for (int i = 0; i < region->num_regs; i++) {
+                match.emplace_back(
+                    rt::fromLen(region->beg[i]),
+                    str_type{rt::fromChar(start + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])});
             }
-        }
+        });
         return matches;
     }
 
@@ -326,49 +309,15 @@ public:
      */
     template<StrType<K> U, typename T = std::remove_cvref_t<U>> requires storable_str<T, K>
     T replace(U&& text, str_type replText, size_t offset = 0, size_t maxCount = -1, bool substGroups = true) {
-        if (!regexp_) {
+        std::optional<T> result;
+        do_replace(text, replText, offset, maxCount, substGroups, &result, [](const std::vector<str_type>& parts, void* res) {
+            std::optional<T>& result = *static_cast<std::optional<T>*>(res);
+            result = expr_join<K, std::vector<str_type>, 0, false, false>{parts, nullptr};
+        });
+        if (!result) {
             return text;
         }
-        auto replaces = parse_replaces(replText, substGroups);
-
-        std::vector<str_type> parts;
-        size_t delta = 0;
-        const OnigUChar *starto = rt::toChar(text.begin()), *end = rt::toChar(text.end()), *at = starto + rt::toLen(offset),
-                        *prevStart = starto;
-        RegionPtr region{onig_region_new()};
-        for (size_t count = 0; count < maxCount; count++) {
-            int result = onig_search(*this, starto, end, at, end, region.get(), ONIG_OPTION_NONE);
-            if (result >= 0) {
-                delta = rt::fromLen(int(starto + region->beg[0] - prevStart));
-                if (delta) {
-                    parts.emplace_back(rt::fromChar(prevStart), delta);
-                }
-                for (const auto& [idx, text]: replaces) {
-                    if (idx < 0) {
-                        parts.emplace_back(text);
-                    } else if (idx < region->num_regs) {
-                        delta = rt::fromLen(region->end[idx] - region->beg[idx]);
-                        if (delta) {
-                            parts.emplace_back(rt::fromChar(starto + region->beg[idx]), delta);
-                        }
-                    }
-                }
-                const OnigUChar* newAt = starto + region->end[0];
-                if (newAt <= at || at >= end) {
-                    break;
-                }
-                at = prevStart = newAt;
-            } else {
-                break;
-            }
-        }
-        if (parts.empty()) {
-            return std::forward<U>(text);
-        }
-        if (at < end) {
-            parts.emplace_back(rt::fromChar(at), rt::fromLen(int(end - at)));
-        }
-        return expr_join<K, std::vector<str_type>, 0, false, false>{parts, nullptr};
+        return std::move(result).value();
     }
     /*!
      * @brief Заменить вхождения на текст, возвращаемый из функции обработчика.
@@ -385,60 +334,38 @@ public:
      */
     template<StrType<K> U, typename T = std::remove_cvref_t<U>> requires storable_str<T, K>
     T replace_cb(U&& text, auto replacer, size_t offset = 0, size_t maxCount = -1) {
-        if (!regexp_) {
+        str_type from = text;
+        auto matches = all_matches(from, offset, maxCount);
+        if (matches.empty()) {
             return text;
         }
         std::vector<str_type> parts;
         using replacer_ret_t = decltype(replacer(std::declval<std::vector<std::pair<size_t, str_type>>>()));
-        std::list<replacer_ret_t> calcParts;
-        
-        size_t delta = 0;
-        const OnigUChar *starto = rt::toChar(text.symbols()), *end = rt::toChar(text.symbols() + text.length()), *at = starto + rt::toLen(offset),
-                        *prevStart = starto;
-        RegionPtr region{onig_region_new()};
-        
-        for (size_t count = 0; count < maxCount; count++) {
-            int result = onig_search(*this, starto, end, at, end, region.get(), ONIG_OPTION_NONE);
-            if (result >= 0) {
-                delta = rt::fromLen(int(starto + region->beg[0] - prevStart));
-                if (delta) {
-                    parts.emplace_back(rt::fromChar(prevStart), delta);
-                }
-                std::vector<std::pair<size_t, str_type>> match;
-                match.reserve(region->num_regs);
-                for (int i = 0; i < region->num_regs; i++) {
-                    match.emplace_back(
-                        rt::fromLen(region->beg[i]),
-                        str_type{rt::fromChar(starto + region->beg[i]), rt::fromLen(region->end[i] - region->beg[i])}
-                    );
-                }
-
-                calcParts.emplace_back(replacer(std::move(match)));
-                parts.emplace_back(calcParts.back());
-
-                const OnigUChar* newAt = starto + region->end[0];
-                if (newAt <= at || at >= end) {
-                    break;
-                }
-                at = prevStart = newAt;
-            } else {
-                break;
+        std::vector<replacer_ret_t> calcParts;
+        parts.reserve(matches.size() * 2 + 1);
+        calcParts.reserve(matches.size());
+        size_t last = 0;
+        for (const auto& match: matches) {
+            size_t delta = match[0].first - last;
+            if (delta) {
+                parts.emplace_back(from(last, delta));
             }
+            parts.emplace_back(calcParts.emplace_back(replacer(match)));
+            last = match[0].first + match[0].second.len;
         }
-        if (parts.empty()) {
-            // Ничего не заменили, просто форварднем исходный текст.
-            return std::forward<U>(text);
-        }
-        if (at < end) {
-            // Добавим последний кусочек
-            parts.emplace_back(rt::fromChar(at), rt::fromLen(int(end - at)));
+        if (last < from.len) {
+            parts.emplace_back(from(last));
         }
         return expr_join<K, std::vector<str_type>, 0, false, false>{parts, nullptr};
     }
 protected:
+    using repl_result_func = void(*)(const std::vector<str_type>&, void* result);
     SIMREX_API str_type first_founded_str(str_type text, size_t offset) const;
-    SIMREX_API void all_founded_str(str_type text, size_t offset, size_t maxCount, void(*func)(str_type, void*), void* result) const;
-    SIMREX_API std::vector<std::pair<int, str_type>> parse_replaces(str_type replText, bool substGroups);
+    SIMREX_API void all_founded_str(str_type text, size_t offset, size_t maxCount, void* result, void(*func)(str_type, void*)) const;
+    SIMREX_API void for_first_match(str_type text, size_t offset, void* res, void(*func)(OnigRegion*, const OnigUChar*, void*)) const;
+    SIMREX_API void for_all_match(str_type text, size_t offset, size_t maxCount, void* res, void(*func)(OnigRegion*, const OnigUChar*, void*)) const;
+    SIMREX_API void do_replace(str_type text, str_type replText, size_t offset, size_t maxCount, bool substGroups, void* res, repl_result_func func);
+    SIMREX_API static OnigEncoding rex_encoding();
 };
 
 using OnigRex = OnigRegexp<u8s>;

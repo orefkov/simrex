@@ -128,16 +128,16 @@ TEST(SimRex, MatchFirstSimple) {
     {
         OnigRegexp<u8s> rex{"b(a+)"};
         EXPECT_TRUE(rex.isValid());
-        auto match = rex.first_matched("bbbbaaba");
+        auto match = rex.texts_in_first_match("bbbbaaba");
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], "baa");
         EXPECT_EQ(match[1], "aa");
-        match = rex.first_matched("bbbbaaba", 4);
+        match = rex.texts_in_first_match("bbbbaaba", 4);
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], "ba");
         EXPECT_EQ(match[1], "a");
 
-        auto smatch = rex.first_matched<stringa>("bbbbaa");
+        auto smatch = rex.texts_in_first_match<stringa>("bbbbaa");
         EXPECT_EQ(smatch.size(), 2u);
         EXPECT_EQ(smatch[0], "baa");
         EXPECT_EQ(smatch[1], "aa");
@@ -145,15 +145,15 @@ TEST(SimRex, MatchFirstSimple) {
     {
         OnigRegexp<u16s> rex{u"b(a+)"};
         EXPECT_TRUE(rex.isValid());
-        auto match = rex.first_matched(u"bbbbaaba");
+        auto match = rex.texts_in_first_match(u"bbbbaaba");
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], u"baa");
         EXPECT_EQ(match[1], u"aa");
-        match = rex.first_matched(u"bbbbaaba", 4);
+        match = rex.texts_in_first_match(u"bbbbaaba", 4);
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], u"ba");
         EXPECT_EQ(match[1], u"a");
-        auto smatch = rex.first_matched<stringu>(u"bbbbaa");
+        auto smatch = rex.texts_in_first_match<stringu>(u"bbbbaa");
         EXPECT_EQ(smatch.size(), 2u);
         EXPECT_EQ(smatch[0], u"baa");
         EXPECT_EQ(smatch[1], u"aa");
@@ -161,15 +161,15 @@ TEST(SimRex, MatchFirstSimple) {
     {
         OnigRegexp<u32s> rex{U"b(a+)"};
         EXPECT_TRUE(rex.isValid());
-        auto match = rex.first_matched(U"bbbbaaba");
+        auto match = rex.texts_in_first_match(U"bbbbaaba");
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], U"baa");
         EXPECT_EQ(match[1], U"aa");
-        match = rex.first_matched(U"bbbbaaba", 4);
+        match = rex.texts_in_first_match(U"bbbbaaba", 4);
         EXPECT_EQ(match.size(), 2u);
         EXPECT_EQ(match[0], U"ba");
         EXPECT_EQ(match[1], U"a");
-        auto smatch = rex.first_matched<stringuu>(U"bbbbaa");
+        auto smatch = rex.texts_in_first_match<stringuu>(U"bbbbaa");
         EXPECT_EQ(smatch.size(), 2u);
         EXPECT_EQ(smatch[0], U"baa");
         EXPECT_EQ(smatch[1], U"aa");
@@ -251,7 +251,7 @@ TEST(SimRex, MatchFirst) {
 TEST(SimRex, MatchAllSimple) {
     {
         OnigRegexp<u8s> rex{"b(a+)"};
-        auto match = rex.all_matched("bbbaabbbabbaaa");
+        auto match = rex.texts_in_all_matches("bbbaabbbabbaaa");
         EXPECT_EQ(match.size(), 3);
         EXPECT_EQ(match[0][0], "baa");
         EXPECT_EQ(match[0][1], "aa");
@@ -260,14 +260,14 @@ TEST(SimRex, MatchAllSimple) {
         EXPECT_EQ(match[2][0], "baaa");
         EXPECT_EQ(match[2][1], "aaa");
 
-        match = rex.all_matched("bbbaabbbabbaaa", 4);
+        match = rex.texts_in_all_matches("bbbaabbbabbaaa", 4);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], "ba");
         EXPECT_EQ(match[0][1], "a");
         EXPECT_EQ(match[1][0], "baaa");
         EXPECT_EQ(match[1][1], "aaa");
 
-        match = rex.all_matched("bbbaabbbabbaaa", 1, 2);
+        match = rex.texts_in_all_matches("bbbaabbbabbaaa", 1, 2);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], "baa");
         EXPECT_EQ(match[0][1], "aa");
@@ -276,7 +276,7 @@ TEST(SimRex, MatchAllSimple) {
     }
     {
         OnigRegexp<u16s> rex{u"b(a+)"};
-        auto match = rex.all_matched(u"bbbaabbbabbaaa");
+        auto match = rex.texts_in_all_matches(u"bbbaabbbabbaaa");
         EXPECT_EQ(match.size(), 3);
         EXPECT_EQ(match[0][0], u"baa");
         EXPECT_EQ(match[0][1], u"aa");
@@ -285,14 +285,14 @@ TEST(SimRex, MatchAllSimple) {
         EXPECT_EQ(match[2][0], u"baaa");
         EXPECT_EQ(match[2][1], u"aaa");
 
-        match = rex.all_matched(u"bbbaabbbabbaaa", 4);
+        match = rex.texts_in_all_matches(u"bbbaabbbabbaaa", 4);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], u"ba");
         EXPECT_EQ(match[0][1], u"a");
         EXPECT_EQ(match[1][0], u"baaa");
         EXPECT_EQ(match[1][1], u"aaa");
 
-        match = rex.all_matched(u"bbbaabbbabbaaa", 1, 2);
+        match = rex.texts_in_all_matches(u"bbbaabbbabbaaa", 1, 2);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], u"baa");
         EXPECT_EQ(match[0][1], u"aa");
@@ -301,7 +301,7 @@ TEST(SimRex, MatchAllSimple) {
     }
     {
         OnigRegexp<u32s> rex{U"b(a+)"};
-        auto match = rex.all_matched(U"bbbaabbbabbaaa");
+        auto match = rex.texts_in_all_matches(U"bbbaabbbabbaaa");
         EXPECT_EQ(match.size(), 3);
         EXPECT_EQ(match[0][0], U"baa");
         EXPECT_EQ(match[0][1], U"aa");
@@ -310,14 +310,14 @@ TEST(SimRex, MatchAllSimple) {
         EXPECT_EQ(match[2][0], U"baaa");
         EXPECT_EQ(match[2][1], U"aaa");
 
-        match = rex.all_matched(U"bbbaabbbabbaaa", 4);
+        match = rex.texts_in_all_matches(U"bbbaabbbabbaaa", 4);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], U"ba");
         EXPECT_EQ(match[0][1], U"a");
         EXPECT_EQ(match[1][0], U"baaa");
         EXPECT_EQ(match[1][1], U"aaa");
 
-        match = rex.all_matched(U"bbbaabbbabbaaa", 1, 2);
+        match = rex.texts_in_all_matches(U"bbbaabbbabbaaa", 1, 2);
         EXPECT_EQ(match.size(), 2);
         EXPECT_EQ(match[0][0], U"baa");
         EXPECT_EQ(match[0][1], U"aa");
@@ -442,6 +442,53 @@ TEST(SimRex, Replace) {
         EXPECT_EQ(rex.replace<stringuu>(U"bbbaabbbabbaaa", U"-$1^"), U"bb-aa^bb-a^b-aaa^");
         EXPECT_EQ(rex.replace<stringuu>(U"bbbaabbbabbaaa", U"-$1^", 1, 2), U"bb-aa^bb-a^bbaaa");
     }
+    {
+        OnigRegexp<u8s> rex{"d"};
+        stringa v = "bbbaabbbabbaaa";
+        stringa r = rex.replace(v, "-");
+        EXPECT_EQ(v, "bbbaabbbabbaaa");
+        EXPECT_EQ(v, r);
+        // Так как замены не было, строка-результат должна была инициироваться из исходной строки, и
+        // значит просто скопировать ссылку на литерал.
+        EXPECT_EQ(v.c_str(), r.c_str());
+    }
+    {
+        OnigRegexp<u8s> rex{"b"};
+        stringa v = "bbbaabbbabbaaa";
+        stringa r = rex.replace(v, "$0");
+        // Вхождение заменялось на само себя
+        EXPECT_EQ(v, "bbbaabbbabbaaa");
+        EXPECT_EQ(v, r);
+        // Так как замена была, строка-результат должна стать новой, хотя и с тем же содержанием.
+        EXPECT_NE(v.c_str(), r.c_str());
+    }
 }
 
+TEST(SimRex, ReplaceCb) {
+    {
+        OnigRegexp<u8s> rex{"b(a+)"};
+        EXPECT_EQ(rex.replace_cb<stringa>("bbbaabbbabbaaa", [](const std::vector<std::pair<size_t, ssa>>& match) -> stringa {
+            return "-" + match[1].second + "-";
+        }), "bb-aa-bb-a-b-aaa-");
+    }
+    {
+        OnigRegexp<u8s> rex{"d"};
+        stringa v = "bbbaabbbabbaaa";
+        stringa r = rex.replace_cb(v, [](const auto&){return stringa{};});
+        EXPECT_EQ(v, "bbbaabbbabbaaa");
+        EXPECT_EQ(v, r);
+        // Так как замены не было, строка-результат должна была инициироваться из исходной строки, и
+        // значит просто скопировать ссылку на литерал.
+        EXPECT_EQ(v.c_str(), r.c_str());
+    }
+    {
+        OnigRegexp<u8s> rex{"b"};
+        stringa v = "bbbaabbbabbaaa";
+        stringa r = rex.replace_cb(v, [](const auto& match){return stringa{match[0].second};});
+        EXPECT_EQ(v, "bbbaabbbabbaaa");
+        EXPECT_EQ(v, r);
+        // Так как замена была, строка-результат должна стать новой, хотя и с тем же содержанием.
+        EXPECT_NE(v.c_str(), r.c_str());
+    }
+}
 } // namespace simrex::testing
