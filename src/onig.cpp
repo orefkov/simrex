@@ -2,9 +2,12 @@
 
 namespace simrex {
 
-void OnigRegionDeleter::operator()(OnigRegion* region) const {
-    onig_region_free(region, 1);
-}
+struct OnigRegionDeleter {
+    void operator()(OnigRegion* region) const {
+        onig_region_free(region, 1);
+    }
+};
+using RegionPtr = std::unique_ptr<OnigRegion, OnigRegionDeleter>;
 
 void  OnigRexDeleter::operator()(OnigRegex rex) const {
     onig_free(rex);

@@ -28,15 +28,11 @@ namespace simrex {
 using namespace simstr;
 using namespace simstr::literals;
 
-struct OnigRegionDeleter {
-    SIMREX_API void operator()(OnigRegion* region) const;
-};
 struct OnigRexDeleter {
     SIMREX_API void operator()(OnigRegex rex) const;
 };
 
 using RegexPtr = std::unique_ptr<OnigRegexType, OnigRexDeleter>;
-using RegionPtr = std::unique_ptr<OnigRegion, OnigRegionDeleter>;
 
 class OnigRegExpBase {
 public:

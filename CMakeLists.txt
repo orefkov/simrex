@@ -53,7 +53,7 @@ function(add_simstr)
         simstr
         GIT_REPOSITORY https://github.com/orefkov/simstr.git
         GIT_SHALLOW TRUE
-        GIT_TAG tags/rel1.2.5
+        GIT_TAG 458007e
         FIND_PACKAGE_ARGS NAMES simstr
     )
     FetchContent_MakeAvailable(simstr)
@@ -69,7 +69,7 @@ function(add_oniguruma)
         GIT_REPOSITORY https://github.com/kkos/oniguruma.git
         GIT_SHALLOW TRUE
         GIT_TAG v6.9.10
-        FIND_PACKAGE_ARGS NAMES oniguruma 
+        FIND_PACKAGE_ARGS NAMES oniguruma
     )
     FetchContent_MakeAvailable(oniguruma)
     if (NOT ${oniguruma_FOUND})
