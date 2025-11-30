@@ -304,7 +304,7 @@ public:
      *      $Любые другие варианты - вставляются как есть.
      */
     template<StrType<K> U, typename T = std::remove_cvref_t<U>> requires storable_str<T, K>
-    T replace(U&& text, str_type replText, size_t offset = 0, size_t maxCount = -1, bool substGroups = true) {
+    T replace(U&& text, str_type replText, size_t offset = 0, size_t maxCount = -1, bool substGroups = true) const {
         std::optional<T> result;
         do_replace(text, replText, offset, maxCount, substGroups, &result, [](const std::vector<str_type>& parts, void* res) {
             std::optional<T>& result = *static_cast<std::optional<T>*>(res);
@@ -329,7 +329,7 @@ public:
      *      Вернуть же она должна текст, который будет вставлен вместо вхождения.
      */
     template<StrType<K> U, typename T = std::remove_cvref_t<U>> requires storable_str<T, K>
-    T replace_cb(U&& text, auto replacer, size_t offset = 0, size_t maxCount = -1) {
+    T replace_cb(U&& text, auto replacer, size_t offset = 0, size_t maxCount = -1) const {
         str_type from = text;
         auto matches = all_matches(from, offset, maxCount);
         if (matches.empty()) {
@@ -360,7 +360,7 @@ protected:
     SIMREX_API void all_founded_str(str_type text, size_t offset, size_t maxCount, void* result, void(*func)(str_type, void*)) const;
     SIMREX_API void for_first_match(str_type text, size_t offset, void* res, void(*func)(OnigRegion*, const OnigUChar*, void*)) const;
     SIMREX_API void for_all_match(str_type text, size_t offset, size_t maxCount, void* res, void(*func)(OnigRegion*, const OnigUChar*, void*)) const;
-    SIMREX_API void do_replace(str_type text, str_type replText, size_t offset, size_t maxCount, bool substGroups, void* res, repl_result_func func);
+    SIMREX_API void do_replace(str_type text, str_type replText, size_t offset, size_t maxCount, bool substGroups, void* res, repl_result_func func) const;
     SIMREX_API static OnigEncoding rex_encoding();
 };
 

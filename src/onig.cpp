@@ -291,7 +291,7 @@ std::vector<std::pair<int, simple_str<K>>> parse_replaces(simple_str<K> replText
 }
 
 template<typename K>
-void OnigRegexp<K>::do_replace(str_type text, str_type replText, size_t offset, size_t maxCount, bool substGroups, void* res, repl_result_func func) {
+void OnigRegexp<K>::do_replace(str_type text, str_type replText, size_t offset, size_t maxCount, bool substGroups, void* res, repl_result_func func) const {
     if (!regexp_) {
         return;
     }
